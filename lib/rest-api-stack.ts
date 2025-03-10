@@ -51,6 +51,23 @@ export class RestAPIStack extends cdk.Stack {
         },
       });
 
+        // Delete Movie by ID
+        const deleteMovieByIdFn = new lambdanode.NodejsFunction(
+          this,
+          "DeleteMovieByIdFn",
+          {
+              architecture: lambda.Architecture.ARM_64,
+              runtime: lambda.Runtime.NODEJS_18_X,
+              entry: `${__dirname}/../lambdas/deleteMovie.ts`,
+              timeout: cdk.Duration.seconds(10),
+              memorySize: 128,
+              environment: {
+                  TABLE_NAME: moviesTable.tableName,
+                  REGION: "eu-west-1",
+              },
+          }
+      );
+
       const getAllMoviesFn = new lambdanode.NodejsFunction(
         this,
         "GetAllMoviesFn",
@@ -87,6 +104,7 @@ export class RestAPIStack extends cdk.Stack {
         moviesTable.grantReadData(getMovieByIdFn)
         moviesTable.grantReadData(getAllMoviesFn)
         moviesTable.grantReadWriteData(newMovieFn)
+        moviesTable.grant(deleteMovieByIdFn, "dynamodb:DeleteItem");
         
          // REST API 
     const api = new apig.RestApi(this, "RestAPI", {
@@ -113,11 +131,16 @@ export class RestAPIStack extends cdk.Stack {
       new apig.LambdaIntegration(newMovieFn, { proxy: true })
     );
 
+    
     // Detail movie endpoint
     const specificMovieEndpoint = moviesEndpoint.addResource("{movieId}");
     specificMovieEndpoint.addMethod(
       "GET",
       new apig.LambdaIntegration(getMovieByIdFn, { proxy: true })
+    );
+    specificMovieEndpoint.addMethod(
+      "DELETE",
+      new apig.LambdaIntegration(deleteMovieByIdFn, { proxy: true })
     );
       }
     }
